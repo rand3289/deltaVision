@@ -64,9 +64,9 @@ int main(int argc, char* argv[]){
     moveWindow(deltaWin,  600, 300);
 
 
-    const cv::Scalar colorR = CV_RGB(255,0,0); // const cv::Scalar color(0,0,255);
+//    const cv::Scalar colorR = CV_RGB(255,0,0); // const cv::Scalar color(0,0,255);
 //    const cv::Scalar colorG = CV_RGB(0,255,0);
-//    const cv::Scalar colorB = CV_RGB(0,0,255);
+    const cv::Scalar colorB = CV_RGB(0,0,255);
 
     cv::Mat img;
     cv::Mat imgGrey;
@@ -85,26 +85,20 @@ int main(int argc, char* argv[]){
         cerr << "ERR: could not read an image from camera." << endl;
     }
 
-    double data [img.rows][img.cols];
+    double data [img.rows][img.cols]; // use the resolution of an aquired image
     for(int y =0; y < img.rows; ++y){
         for(int x=0; x<img.cols; ++x){
-           data[y][x] = 127;
+           data[y][x] = 0;
         }
     }
 
     while( cam.read(img) ){
         cv::cvtColor(img, imgGrey, cv::COLOR_BGR2GRAY);
 
-        stringstream ss;
-	ss << "s to save, q to quit. fps=" << std::setprecision(3) << getFps();
-	const cv::Point xy(5,img.rows-5);
-	cv::putText(img, ss.str(), xy, 0, 0.4, colorR);
-        imshow(dataWin, img);
-
-
         for(int y=0; y< imgGrey.rows; ++y){
             for(int x=0; x < imgGrey.cols; ++x){
-                int delta = imgGrey.at<uchar>(y,x) - imgPrev.at<uchar>(y,x);
+                double delta = imgGrey.at<uchar>(y,x) - imgPrev.at<uchar>(y,x);
+//                delta -= 0.5;
                 data[y][x] += delta;
 		int pix = data[y][x];
                 imgOut.at<uchar>(y,x) = pix>255 ? 255 : pix;
@@ -112,6 +106,12 @@ int main(int argc, char* argv[]){
         }
 
         imgPrev = imgGrey.clone();
+
+        stringstream ss;
+	ss << "q to quit. fps=" << std::setprecision(3) << getFps();
+	const cv::Point xy(5,img.rows-5);
+	cv::putText(imgGrey, ss.str(), xy, 0, 0.4, colorB);
+        imshow(dataWin, imgGrey);
         imshow(deltaWin, imgOut);
 
         char c = waitKey(1);
