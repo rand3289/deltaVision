@@ -16,7 +16,7 @@ struct FiberInfo {
 
 
 void mouse(int event, int x, int y, int flags, void* userdata){
-	if( EVENT_LBUTTONUP != event ) { return; }
+    if( EVENT_LBUTTONUP != event ) { return; }
 }
 
 
@@ -79,19 +79,37 @@ int main(int argc, char* argv[]){
 
     if( cam.read(img) ){
         cv::cvtColor(img, imgOut, cv::COLOR_BGR2GRAY);
-        imgOut = 0; // clear the image
+        imgPrev = imgOut.clone();
+        imgPrev = 0; // clear the image
     } else {
         cerr << "ERR: could not read an image from camera." << endl;
     }
 
+    double data [img.rows][img.cols];
+    for(int y =0; y < img.rows; ++y){
+        for(int x=0; x<img.cols; ++x){
+           data[y][x] = 127;
+        }
+    }
+
     while( cam.read(img) ){
+        cv::cvtColor(img, imgGrey, cv::COLOR_BGR2GRAY);
+
         stringstream ss;
 	ss << "s to save, q to quit. fps=" << std::setprecision(3) << getFps();
 	const cv::Point xy(5,img.rows-5);
 	cv::putText(img, ss.str(), xy, 0, 0.4, colorR);
         imshow(dataWin, img);
 
-        cv::cvtColor(img, imgGrey, cv::COLOR_BGR2GRAY);
+
+        for(int y=0; y< imgGrey.rows; ++y){
+            for(int x=0; x < imgGrey.cols; ++x){
+                int delta = imgGrey.at<uchar>(y,x) - imgPrev.at<uchar>(y,x);
+                data[y][x] += delta;
+		int pix = data[y][x];
+                imgOut.at<uchar>(y,x) = pix>255 ? 255 : pix;
+            }
+        }
 
         imgPrev = imgGrey.clone();
         imshow(deltaWin, imgOut);
