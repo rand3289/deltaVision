@@ -5,16 +5,19 @@
 #include <iomanip> // format stream printing
 #include <vector>
 #include <algorithm>
+#include <chrono>
 using namespace std;
 using namespace cv;
 
 
 struct FiberInfo {
     int camID = 0;
-    int minD = 0;
-    std::vector<cv::Point2f> fibers;      // detected fiber centers
 };
 
+
+void mouse(int event, int x, int y, int flags, void* userdata){
+	if( EVENT_LBUTTONUP != event ) { return; }
+}
 
 
 int getVideoSrcCount(cv::VideoCapture& cam){ // how many video sources are there in the current system?
@@ -26,44 +29,6 @@ int getVideoSrcCount(cv::VideoCapture& cam){ // how many video sources are there
 }
 
 
-struct VideoInfo{
-	cv::VideoCapture& cam;
-	const string& file;
-	const int max; // max possible trackbar value
-	VideoInfo(cv::VideoCapture& camera, string& fileName, int maxIndex): cam(camera), file(fileName), max(maxIndex) {}
-};
-
-void idChanged(int pos, void* userData){ // trackbar callback
-	VideoInfo& inf = *static_cast<VideoInfo*>(userData);
-	inf.cam.release();
-	if( inf.max==pos  &&  inf.file.length() > 0){
-	    inf.cam.open(inf.file);
-	} else {
-	    inf.cam.open(pos);
-	}
-}
-
-
-// allow user to add or delete fibers by clicking on the video
-void mouse(int event, int x, int y, int flags, void* userdata){
-	if( EVENT_LBUTTONUP != event ) { return; }
-	FiberInfo* info = static_cast<FiberInfo*> (userdata);
-	std::vector<cv::Point2f>& fibers = info->fibers;
-
-	auto found = std::find_if(fibers.begin(), fibers.end(), [=](const cv::Point2f& pt){ 
-		const int dx = pt.x - x;
-		const int dy = pt.y - y;
-		return info->minD > sqrt(dx*dx+dy*dy); // find distance between points (hypotenuse)
-	} );
-	if(fibers.end() ==  found){
-		fibers.emplace_back((float)x, (float)y);
-	} else {
-		fibers.erase(found);
-	}
-}
-
-
-#include <chrono>
 double getFps(){
 	static int count = 0;
 	static double fps = 0;
@@ -99,30 +64,41 @@ int main(int argc, char* argv[]){
     moveWindow(deltaWin,  600, 300);
 
 
-//    const cv::Scalar colorR = CV_RGB(255,0,0); // const cv::Scalar color(0,0,255);
+    const cv::Scalar colorR = CV_RGB(255,0,0); // const cv::Scalar color(0,0,255);
 //    const cv::Scalar colorG = CV_RGB(0,255,0);
-    const cv::Scalar colorB = CV_RGB(0,0,255);
+//    const cv::Scalar colorB = CV_RGB(0,0,255);
 
     cv::Mat img;
     cv::Mat imgGrey;
+    cv::Mat imgPrev;
     cv::Mat imgOut;
+    if( !cam.isOpened() ){
+        cerr << "ERR: could not open camera." << endl;
+        exit(1);
+    }
 
-    while( cam.isOpened() ){
-        if( !cam.read(img) ){
-            cam.release();
-        }
+    if( cam.read(img) ){
+        cv::cvtColor(img, imgOut, cv::COLOR_BGR2GRAY);
+        imgOut = 0; // clear the image
+    } else {
+        cerr << "ERR: could not read an image from camera." << endl;
+    }
 
+    while( cam.read(img) ){
         stringstream ss;
 	ss << "s to save, q to quit. fps=" << std::setprecision(3) << getFps();
 	const cv::Point xy(5,img.rows-5);
-	cv::putText(img, ss.str(), xy, 0, 0.4, colorB);
+	cv::putText(img, ss.str(), xy, 0, 0.4, colorR);
         imshow(dataWin, img);
 
         cv::cvtColor(img, imgGrey, cv::COLOR_BGR2GRAY);
-        imshow(deltaWin, imgGrey);
+
+        imgPrev = imgGrey.clone();
+        imshow(deltaWin, imgOut);
 
         char c = waitKey(1);
 	const char ESCAPE = 27;
         if('q'==c || 'Q'==c || ESCAPE==c) { break; }
     }
+    cam.release();
 }
