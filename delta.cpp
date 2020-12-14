@@ -113,11 +113,8 @@ int main(int argc, char* argv[]){
                     case 4:
                         data[y][x] += abs(delta); // dt starts with UNINITIALIZED (random) data !!!
                         pix = data[y][x];
-                        if (pix > 127){
-                            data[y][x] = pix / 2;
-                        } else {
-                            data[y][x] -= 1;
-                        }
+                        data[y][x] = pix - (pix / 3);
+                        pix *= 2;
                         break;
 		}
 		if(checkBounds){ // allow overflow?
