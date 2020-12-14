@@ -11,19 +11,22 @@ using namespace cv;
 
 
 struct FiberInfo {
-    int camID = 0;
+    int algorithm = 0;
 };
 
 
 void mouse(int event, int x, int y, int flags, void* userdata){
     if( EVENT_LBUTTONUP != event ) { return; }
+    FiberInfo* data = static_cast<FiberInfo*>(userdata);
+    ++data->algorithm;
 }
 
 
 int getVideoSrcCount(cv::VideoCapture& cam){ // how many video sources are there in the current system?
     int i = 0;
-    for( ; cam.open(i); ++i ) {
-        cam.release(); 
+    while( cam.open(i) ) {
+        cam.release();
+        ++i;
     }
     return i;
 }
@@ -47,31 +50,30 @@ double getFps(){
 int main(int argc, char* argv[]){
     cv::VideoCapture cam;
     const int camCount = getVideoSrcCount(cam);
-    cout << "Found " << camCount << " video sources" << endl;
+    cout << "######## Found " << camCount << " video sources" << endl;
     cout.flush();
+    cam.open( camCount-1 ); // convert device count to the largest existing zero based device index and open it
 
-    FiberInfo info;
-    info.camID = camCount; // for use with files, set the trackbar to the last value (non-existent device)
-    cam.open( --info.camID ); // convert device count to the largest existing zero based device index and open it
-
-    const char dataWin[] = "grayscale";
+    const char dataWin[] = "original";
     namedWindow(dataWin);
     moveWindow(dataWin,  10, 50);
-    setMouseCallback(dataWin, mouse, (void*)&info);
 
     const char deltaWin[] = "delta";
     namedWindow(deltaWin);
     moveWindow(deltaWin,  600, 300);
 
+    FiberInfo info1; // for each window
+    FiberInfo info2;
+    setMouseCallback(dataWin,  mouse, (void*)&info1); 
+    setMouseCallback(deltaWin, mouse, (void*)&info2);
 
-//    const cv::Scalar colorR = CV_RGB(255,0,0); // const cv::Scalar color(0,0,255);
-//    const cv::Scalar colorG = CV_RGB(0,255,0);
-    const cv::Scalar colorB = CV_RGB(0,0,255);
+    const cv::Scalar colorW = CV_RGB(255,255,255);
 
     cv::Mat img;
     cv::Mat imgGrey;
     cv::Mat imgPrev;
     cv::Mat imgOut;
+
     if( !cam.isOpened() ){
         cerr << "ERR: could not open camera." << endl;
         exit(1);
@@ -83,6 +85,7 @@ int main(int argc, char* argv[]){
         imgPrev = 0; // clear the image
     } else {
         cerr << "ERR: could not read an image from camera." << endl;
+        exit(2);
     }
 
     double data [img.rows][img.cols]; // use the resolution of an aquired image
@@ -93,25 +96,45 @@ int main(int argc, char* argv[]){
     }
 
     while( cam.read(img) ){
-        cv::cvtColor(img, imgGrey, cv::COLOR_BGR2GRAY);
+        cv::cvtColor(img, imgGrey, cv::COLOR_BGR2GRAY); // convert to grayscale
 
         for(int y=0; y< imgGrey.rows; ++y){
             for(int x=0; x < imgGrey.cols; ++x){
+		int pix = 0;
+                bool checkBounds = true;
                 double delta = imgGrey.at<uchar>(y,x) - imgPrev.at<uchar>(y,x);
-//                delta -= 0.5;
-                data[y][x] += delta;
-		int pix = data[y][x];
-                imgOut.at<uchar>(y,x) = pix>255 ? 255 : pix;
+
+		switch(info2.algorithm){
+		    default: info2.algorithm = 0; // fall through to case 0
+                    case 0: pix = 127+delta; break;
+                    case 1: pix = 127-delta; break;
+                    case 2: pix = delta;  checkBounds = false; break;
+                    case 3: pix = -delta; checkBounds = false; break;
+                    case 4:
+                        data[y][x] += abs(delta); // dt starts with UNINITIALIZED (random) data !!!
+                        pix = data[y][x];
+                        if (pix > 127){
+                            data[y][x] = pix / 2;
+                        } else {
+                            data[y][x] -= 1;
+                        }
+                        break;
+		}
+		if(checkBounds){ // allow overflow?
+                    pix = pix > 255 ? 255 : (pix < 0 ? 0 : pix); 
+                }
+                imgOut.at<uchar>(y,x) = pix;
             }
         }
 
         imgPrev = imgGrey.clone();
 
         stringstream ss;
-	ss << "q to quit. fps=" << std::setprecision(3) << getFps();
-	const cv::Point xy(5,img.rows-5);
-	cv::putText(imgGrey, ss.str(), xy, 0, 0.4, colorB);
-        imshow(dataWin, imgGrey);
+	ss << "Q to quit.  fps=" << std::setprecision(3) << getFps() << "  algorithm=" << info2.algorithm;
+	const cv::Point xy(5,img.rows-10);
+        Mat curr = info1.algorithm % 2 ? img : imgGrey; // algorithm is changed by mouse click
+	cv::putText(curr, ss.str(), xy, 0, 0.8, colorW);
+        imshow(dataWin, curr);
         imshow(deltaWin, imgOut);
 
         char c = waitKey(1);
