@@ -106,16 +106,18 @@ int main(int argc, char* argv[]){
 
 		switch(info2.algorithm){
 		    default: info2.algorithm = 0; // fall through to case 0
-                    case 0: pix = 127+delta; break;
-                    case 1: pix = 127-delta; break;
-                    case 2: pix = delta;  checkBounds = false; break;
-                    case 3: pix = -delta; checkBounds = false; break;
-                    case 4:
+                    case 0: pix = 127-delta; break;
+                    case 1: pix = delta;  checkBounds = false; break;
+                    case 2:
                         data[y][x] += abs(delta); // dt starts with UNINITIALIZED (random) data !!!
                         pix = data[y][x];
-                        data[y][x] = pix - (pix / 3);
-                        pix *= 2;
+                        data[y][x] = pix / 2;
+//                        data[y][x] = pix - (pix / 2);
+//                        pix *= 2;
+//                        pix = 255 - pix;
                         break;
+//                    case : pix = 127+delta; break;
+//                    case : pix = -delta; checkBounds = false; break;
 		}
 		if(checkBounds){ // allow overflow?
                     pix = pix > 255 ? 255 : (pix < 0 ? 0 : pix); 
@@ -127,7 +129,7 @@ int main(int argc, char* argv[]){
         imgPrev = imgGrey.clone();
 
         stringstream ss;
-	ss << "Q to quit.  fps=" << std::setprecision(3) << getFps() << "  algorithm=" << info2.algorithm;
+	ss << "Q to quit.  algorithm=" << info2.algorithm << "  fps=" << std::setprecision(3) << getFps();
 	const cv::Point xy(5,img.rows-10);
         Mat curr = info1.algorithm % 2 ? img : imgGrey; // algorithm is changed by mouse click
 	cv::putText(curr, ss.str(), xy, 0, 0.8, colorW);
